@@ -10,11 +10,31 @@
     "vscode": "^1.75.0"
   },
   "activationEvents": [
-    "onLanguage"
+    "onLanguage:uxml"
   ],
   "main": "./client/out/extension",
   "contributes": {
-    "configuration": {}
+    "languages": [
+      {
+        "id": "uxml",
+        "aliases": [
+          "uxml",
+          "uxml_"
+        ],
+        "extensions": [
+          ".uxml",
+          ".uxml_"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "uxml",
+        "scopeName": "text.xml.uxml",
+        "path": "./syntaxes/uxmlScratch.tmLanguage.json"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

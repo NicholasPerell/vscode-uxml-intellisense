@@ -1,0 +1,15 @@
+{
+    "scopeName": "text.xml.uxml",
+    "fileTypes": [
+        "uxml",
+        "uxml_"
+    ],
+    "patterns": [
+        {
+            "include": "text.xml"
+        },
+        {
+            "include": "source.xml"
+        }
+    ]
+}
