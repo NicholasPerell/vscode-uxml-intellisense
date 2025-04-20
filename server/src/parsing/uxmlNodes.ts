@@ -1,5 +1,3 @@
-import { ParsingError } from "./uxmlError";
-import { Parser } from "./uxmlParser";
 import { Scanner, TrimOptions } from "./uxmlScanner";
 import { Token, TokenType } from "./uxmlTokens";
 

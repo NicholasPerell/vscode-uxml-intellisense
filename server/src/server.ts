@@ -5,10 +5,13 @@ import {
   InitializeParams,
   TextDocumentSyncKind,
   InitializeResult,
+  DocumentDiagnosticReportKind,
+  DocumentDiagnosticReport,
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { Parser } from "./parsing/uxmlParser";
+import { doValidation } from "./services/validation";
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -62,26 +65,32 @@ connection.onInitialize((params: InitializeParams) => {
   return result;
 });
 
+connection.languages.diagnostics.on(async (params) => {
+  const document = documents.get(params.textDocument.uri);
+  if (document !== undefined) {
+    return {
+      kind: DocumentDiagnosticReportKind.Full,
+      items: doValidation(document)
+    } satisfies DocumentDiagnosticReport;
+  } else {
+    // We don't know the document. We can either try to read it from disk
+    // or we don't report problems for it.
+    return {
+      kind: DocumentDiagnosticReportKind.Full,
+      items: []
+    } satisfies DocumentDiagnosticReport;
+  }
+});
+
 documents.onDidChangeContent((change) => {
   const document = documents.get(change.document.uri);
-
-  connection.window.showInformationMessage(
-    "onDidChangeContent: " + change.document.uri
-  );
-
-  try {
-    const parser = new Parser(document!);
-    connection.window.showInformationMessage(
-      parser.getNodeText(parser.getProgram().declaration!)
-    );
-  } catch (e) {
+  const parser = new Parser(document!);
+  parser.getErrors().forEach(e =>
     connection.window.showErrorMessage(
       `${e}`
-    );
-  }
-
-
-});
+    ));
+}
+);
 
 // Make the text document manager listen on the connection
 // for open, change and close text document events
