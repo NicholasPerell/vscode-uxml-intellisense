@@ -204,6 +204,12 @@ export class Scanner {
         throw new ParsingError(message, offset, offset);
     }
 
+    public throwParsingErrorBetweenOffsets(message: string, start: number, end: number) {
+        const pos = this.document!.positionAt(start);
+        message = `(Ln ${pos.line + 1}, Col ${pos.character + 1}) ${message}`;
+        throw new ParsingError(message, start, end);
+    }
+
     public getCurrentToken(offset: number) {
         for (let i = 0; i < this.tokens.length; i++) {
             const token = this.tokens[i];

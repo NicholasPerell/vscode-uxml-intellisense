@@ -56,12 +56,10 @@ export class Program extends Node {
     public constructor(scanner: Scanner) {
         super(scanner);
 
-        attributes = 0;
-
-
         if (scanner.isAhead(TokenType.DeclarationStart)) {
             this.declaration = new Declaration(scanner);
         }
+
         this.root = new Element(scanner);
     }
 
@@ -100,6 +98,8 @@ export class Declaration extends Node {
             }
             else if (attribute.name.text === 'encoding') {
                 this.encoding = attribute;
+            } else {
+                scanner.throwParsingErrorBetweenOffsets(`Declarations do not recognize a \'${attribute.name.text}\' attribute.`, attribute.getStart(), attribute.getEnd());
             }
 
             peeked = scanner.aheadTrimmed();
@@ -130,7 +130,10 @@ export class Declaration extends Node {
     }
 }
 
-export class Element extends Node {
+export abstract class Content extends Node {
+}
+
+export class Element extends Content {
     type = NodeType.Root;
     startElement: StartElement;
     content: Content[] = [];
@@ -143,7 +146,9 @@ export class Element extends Node {
 
         do {
             node = scanner.tryParse([
-                () => new Content(scanner),
+                () => new Comment(scanner),
+                () => new LeafElement(scanner),
+                () => new Element(scanner),
                 () => new EndElement(scanner),
             ]);
 
@@ -156,56 +161,19 @@ export class Element extends Node {
     }
 
     getStart(): number {
-        throw new Error("Method not implemented.");
+        return this.startElement.getStart();
     }
 
     getEnd(): number {
-        throw new Error("Method not implemented.");
+        return this.endElement.getEnd();
     }
 
     getChildNodes(): Node[] {
-        throw new Error("Method not implemented.");
+        return [this.startElement, ...this.content, this.endElement];
     }
 }
 
-export class Content extends Node {
-    type = NodeType.Content;
-    element?: Element;
-    leaf?: LeafElement;
-    comment?: Comment;
-
-    public constructor(scanner: Scanner) {
-        super(scanner);
-        const node = scanner.tryParse([
-            () => new Comment(scanner),
-            () => new LeafElement(scanner),
-            () => new Element(scanner)
-        ]);
-
-        if (node instanceof Element) {
-            this.element = node;
-        } else if (node instanceof LeafElement) {
-            this.leaf = node;
-        } else {
-            this.comment = node as Comment;
-        }
-    }
-
-    getStart(): number {
-        return this.element ? this.element.getStart() : this.comment!.getStart();
-
-    }
-
-    getEnd(): number {
-        return this.element ? this.element.getEnd() : this.comment!.getEnd();
-    }
-
-    getChildNodes(): Node[] {
-        return this.element ? this.element.getChildNodes() : this.comment!.getChildNodes();
-    }
-}
-
-export class Comment extends Node {
+export class Comment extends Content {
     type = NodeType.Comment;
     start: Token;
     end: Token;
@@ -260,9 +228,7 @@ export class Comment extends Node {
     }
 }
 
-let attributes = 0;
-
-export class ElementName extends Node {
+export class Name extends Node {
     type = NodeType.Name;
     namespace?: Namespace;
     contents: Token[];
@@ -292,7 +258,6 @@ export class ElementName extends Node {
 
         this.name = scanner.getTextRange(this.contents[0], this.contents[this.contents.length - 1]);
         this.text = scanner.getTextRange(start, this.contents[this.contents.length - 1]);
-        attributes++;
     }
 
     getStart(): number {
@@ -309,15 +274,14 @@ export class ElementName extends Node {
     }
 }
 
-
 export class Attribute extends Node {
     type = NodeType.Attribute;
-    name: AttributeName;
+    name: Name;
     value: AttributeValue;
 
     public constructor(scanner: Scanner) {
         super(scanner);
-        this.name = new AttributeName(scanner);
+        this.name = new Name(scanner);
         scanner.nextMatch(TokenType.Equals, TrimOptions.Both);
         this.value = new AttributeValue(scanner);
     }
@@ -332,50 +296,6 @@ export class Attribute extends Node {
 
     getChildNodes(): Node[] {
         return [this.name, this.value];
-    }
-}
-
-export class AttributeName extends Node {
-    type = NodeType.AttributeName;
-    namespace?: Namespace;
-    contents: Token[];
-    name: string;
-    text: string;
-
-    public constructor(scanner: Scanner) {
-        super(scanner);
-        const attrNameStartTokens = [TokenType.Alpha, TokenType.Uxml, TokenType.Version, TokenType.Encoding, TokenType.XmlNameSpace];
-        const attrNameTokens = [...attrNameStartTokens, TokenType.Dash, TokenType.Period, TokenType.Colon];
-        this.contents = [scanner.nextMatchSome(attrNameStartTokens)];
-        const start = this.contents[0];
-
-        while (scanner.isAheadSome(attrNameTokens)) {
-            if (scanner.isAhead(TokenType.Colon) && !this.namespace) {
-                scanner.next();
-                this.namespace = new Namespace(scanner, this.contents);
-                this.contents = [scanner.nextMatchSome(attrNameStartTokens)];
-
-                if (!scanner.isAheadSome(attrNameTokens)) {
-                    break;
-                }
-            }
-        }
-
-        this.name = scanner.getTextRange(this.contents[0], this.contents[this.contents.length - 1]);
-        this.text = scanner.getTextRange(start, this.contents[this.contents.length - 1]);
-    }
-
-    getStart(): number {
-        return this.namespace ? this.namespace.getStart() : this.contents[0].offset;
-    }
-
-    getEnd(): number {
-        const last = this.contents[this.contents.length - 1];
-        return last.offset + last.length;
-    }
-
-    getChildNodes(): Node[] {
-        return this.namespace ? [this.namespace] : [];
     }
 }
 
@@ -446,17 +366,17 @@ export class AttributeValue extends Node {
     }
 }
 
-export class LeafElement extends Node {
+export class LeafElement extends Content {
     type = NodeType.LeafElement;
     start: Token;
-    name: ElementName;
+    name: Name;
     attributes: Attribute[];
     end: Token;
 
     public constructor(scanner: Scanner) {
         super(scanner);
         this.start = scanner.nextMatch(TokenType.OpenAngle, TrimOptions.Both);
-        this.name = new ElementName(scanner);
+        this.name = new Name(scanner);
         this.attributes = [];
         let peeked = scanner.aheadTrimmed();
 
@@ -485,14 +405,14 @@ export class LeafElement extends Node {
 export class StartElement extends Node {
     type = NodeType.StartElement;
     start: Token;
-    name: ElementName;
+    name: Name;
     attributes: Attribute[];
     end: Token;
 
     public constructor(scanner: Scanner) {
         super(scanner);
         this.start = scanner.nextMatch(TokenType.OpenAngle, TrimOptions.Both);
-        this.name = new ElementName(scanner);
+        this.name = new Name(scanner);
         this.attributes = [];
         let peeked = scanner.aheadTrimmed();
 
@@ -522,13 +442,13 @@ export class StartElement extends Node {
 export class EndElement extends Node {
     type = NodeType.EndElement;
     start: Token;
-    name: ElementName;
+    name: Name;
     end: Token;
 
     public constructor(scanner: Scanner) {
         super(scanner);
         this.start = scanner.nextMatch(TokenType.EndOpenAngle, TrimOptions.Both);
-        this.name = new ElementName(scanner);
+        this.name = new Name(scanner);
         this.end = scanner.nextMatch(TokenType.CloseAngle, TrimOptions.Both);
     }
 
