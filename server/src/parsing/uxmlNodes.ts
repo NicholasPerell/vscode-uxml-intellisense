@@ -1,3 +1,4 @@
+import { ParsingError } from "./uxmlError";
 import { Scanner, TrimOptions } from "./uxmlScanner";
 import { Token, TokenType } from "./uxmlTokens";
 
@@ -20,6 +21,7 @@ export enum NodeType {
 
 export abstract class Node {
     public readonly abstract type: NodeType;
+    protected errors: ParsingError[] = [];
 
     abstract getStart(): number;
     abstract getEnd(): number;
@@ -42,6 +44,19 @@ export abstract class Node {
         return encasing;
     }
 
+    getErrors(): ParsingError[] {
+        return [...this.errors, ...this.getChildNodes().flatMap(n => n.getErrors())];
+    }
+
+    tryConstruct<Type extends Node>(ctor: new (arg0: Scanner) => Type, scanner: Scanner, panicModeResumers: { tokenType: TokenType, peeking: boolean }[]): Type | undefined {
+        const result = scanner.tryParseOrPanicRecovery<Type>(() => new ctor(scanner), panicModeResumers);
+        if (result instanceof ParsingError) {
+            this.errors.push(result);
+        } else {
+            return result;
+        }
+    }
+
     public constructor(scanner: Scanner) {
     }
 }
@@ -49,28 +64,79 @@ export abstract class Node {
 export class Program extends Node {
     type = NodeType.Program;
     declaration?: Declaration;
-    root: Element;
+    root?: Element;
+    nsEngine?: string;
+    nsEngineNodes: Node[] = [];
 
     public constructor(scanner: Scanner) {
         super(scanner);
 
         if (scanner.isAhead(TokenType.DeclarationStart)) {
-            this.declaration = new Declaration(scanner);
+            this.declaration = this.tryConstruct(Declaration, scanner, [
+                { tokenType: TokenType.DeclarationEnd, peeking: false },
+                { tokenType: TokenType.OpenAngle, peeking: true }
+            ]);
         }
 
-        this.root = new Element(scanner);
+        this.root = this.tryConstruct(Element, scanner, []);
+        this.evaluateRoot();
+    }
+
+    private evaluateRoot() {
+        if (!this.root) {
+            return;
+        }
+
+        const startElement = this.root.startElement;
+
+        const rootName = startElement.name;
+        const uxmlName = rootName.name;
+        const uxmlNameSpace = rootName.namespace?.text ?? '';
+
+        if (uxmlName !== 'UXML') {
+            this.errors.push(new ParsingError('Root element must be a UXML', rootName.getStart(), rootName.getEnd()));
+            return;
+        }
+
+        const attributes = startElement.attributes;
+        const xmlns = attributes.filter(a => (a.name.namespace?.text === 'xmlns') || (!a.name.namespace && a.name.name === 'xmlns'));
+        const engineNameSpaceAttribute = xmlns.find(a => a.value.contentText === 'UnityEngine.UIElements');
+        if (!engineNameSpaceAttribute) {
+            this.errors.push(new ParsingError('Can not find namespace for UnityEngine.UIElements', startElement.getEnd(), startElement.getEnd()));
+            return;
+        }
+        const editorNameSpaceAttribute = xmlns.find(a => a.value.contentText === 'UnityEditor.UIElements');
+        if (!editorNameSpaceAttribute) {
+            this.errors.push(new ParsingError('Can not find namespace for UnityEditor.UIElements', startElement.getEnd(), startElement.getEnd()));
+            return;
+        }
+        const schemaInstanceNameSpaceAttribute = xmlns.find(a => a.value.contentText === 'http://www.w3.org/2001/XMLSchema-instance');
+
+        const engineNameSpace = engineNameSpaceAttribute?.name.namespace ? engineNameSpaceAttribute?.name.name : '';
+        const editorNameSpace = editorNameSpaceAttribute?.name.namespace ? editorNameSpaceAttribute?.name.name : '';
+
+        this.nsEngine = engineNameSpace;
+
+
+
+        if (uxmlNameSpace !== engineNameSpace) {
+            const node = rootName.namespace ?? rootName;
+            this.errors.push(new ParsingError('UXML root does not have the correct namespace', node.getStart(), node.getEnd()))
+            return;
+        }
+
     }
 
     getStart(): number {
-        return this.declaration ? this.declaration.getStart() : this.root.getStart();
+        return this.declaration?.getStart() ?? this.root?.getStart() ?? 0;
     }
 
     getEnd(): number {
-        return this.root.getEnd();
+        return this.root?.getEnd() ?? 0;
     }
 
     getChildNodes(): Node[] {
-        return this.declaration ? [this.declaration, this.root] : [this.root];
+        return [this.declaration, this.root].filter(n => n !== undefined).map(n => n as Node);
     }
 }
 
@@ -88,13 +154,27 @@ export class Declaration extends Node {
         let version;
 
         while (peeked.type !== TokenType.DeclarationEnd) {
-            scanner.nextMatch(TokenType.Whitespace, TrimOptions.End);
-            const attribute = new Attribute(scanner);
+            const matchError = scanner.tryOrPanicRecovery(() => scanner.nextMatch(TokenType.Whitespace, TrimOptions.End), [
+                { tokenType: TokenType.Whitespace, peeking: false },
+                { tokenType: TokenType.DeclarationEnd, peeking: true },
+                { tokenType: TokenType.OpenAngle, peeking: true }
+            ])
 
-            if (attribute.name.text === 'version') {
-                version = attribute;
+            if (matchError) {
+                this.errors.push(matchError);
             }
-            else if (attribute.name.text === 'encoding') {
+
+            const attribute = this.tryConstruct(Attribute, scanner, [
+                { tokenType: TokenType.Whitespace, peeking: false },
+                { tokenType: TokenType.DeclarationEnd, peeking: true },
+                { tokenType: TokenType.OpenAngle, peeking: true }
+            ]);
+
+            if (!attribute) {
+
+            } else if (attribute.name.text === 'version') {
+                version = attribute;
+            } else if (attribute.name.text === 'encoding') {
                 this.encoding = attribute;
             } else {
                 scanner.throwParsingErrorBetweenOffsets(`Declarations do not recognize a \'${attribute.name.text}\' attribute.`, attribute.getStart(), attribute.getEnd());
@@ -379,8 +459,23 @@ export class LeafElement extends Content {
         let peeked = scanner.aheadTrimmed();
 
         while (peeked.type !== TokenType.EndCloseAngle) {
+            const matchError = scanner.tryOrPanicRecovery(() => scanner.nextMatch(TokenType.Whitespace, TrimOptions.End), [
+                { tokenType: TokenType.Whitespace, peeking: false },
+                { tokenType: TokenType.EndCloseAngle, peeking: true },
+                { tokenType: TokenType.OpenAngle, peeking: true }
+            ])
+
+            if (matchError) {
+                this.errors.push(matchError);
+            }
+
+            const attribute = this.tryConstruct(Attribute, scanner, [
+                { tokenType: TokenType.Whitespace, peeking: true },
+                { tokenType: TokenType.EndCloseAngle, peeking: true },
+                { tokenType: TokenType.OpenAngle, peeking: true }
+            ]);
+            if (attribute) { this.attributes.push(attribute); }
             scanner.nextMatch(TokenType.Whitespace, TrimOptions.End);
-            this.attributes.push(new Attribute(scanner));
             peeked = scanner.aheadTrimmed();
         }
 
@@ -415,8 +510,26 @@ export class StartElement extends Node {
         let peeked = scanner.aheadTrimmed();
 
         while (peeked.type !== TokenType.CloseAngle) {
-            scanner.nextMatch(TokenType.Whitespace, TrimOptions.End);
-            this.attributes.push(new Attribute(scanner));
+            const matchError = scanner.tryOrPanicRecovery(() => scanner.nextMatch(TokenType.Whitespace, TrimOptions.End), [
+                { tokenType: TokenType.Whitespace, peeking: false },
+                { tokenType: TokenType.CloseAngle, peeking: true },
+                { tokenType: TokenType.OpenAngle, peeking: true }
+            ])
+
+            if (matchError) {
+                this.errors.push(matchError);
+            }
+
+            const attribute = this.tryConstruct(Attribute, scanner, [
+                { tokenType: TokenType.Whitespace, peeking: false },
+                { tokenType: TokenType.CloseAngle, peeking: true },
+                { tokenType: TokenType.OpenAngle, peeking: true }
+            ]);
+
+            if (attribute) {
+                this.attributes.push(attribute);
+            }
+
             peeked = scanner.aheadTrimmed();
         }
 

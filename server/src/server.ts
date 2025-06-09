@@ -7,11 +7,16 @@ import {
   InitializeResult,
   DocumentDiagnosticReportKind,
   DocumentDiagnosticReport,
+  RenameParams,
+  Position,
+  Range,
+  WorkspaceEdit,
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { Parser } from "./parsing/uxmlParser";
 import { doValidation } from "./services/validation";
+import { doPrepareRename, doRenameRequest } from "./services/renaming";
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -50,7 +55,9 @@ connection.onInitialize((params: InitializeParams) => {
       diagnosticProvider: {
         interFileDependencies: false,
         workspaceDiagnostics: false
-      }
+      },
+      renameProvider: true,
+      // foldingRangeProvider: true
     }
   };
 
@@ -89,8 +96,15 @@ documents.onDidChangeContent((change) => {
     connection.window.showErrorMessage(
       `${e}`
     ));
-}
-);
+  if (parser.getProgram()?.nsEngine) {
+    connection.window.showInformationMessage(
+      parser.getProgram()!.nsEngine!
+    )
+  }
+});
+
+// connection.onPrepareRename(doPrepareRename);
+// connection.onRenameRequest(doRenameRequest);
 
 // Make the text document manager listen on the connection
 // for open, change and close text document events

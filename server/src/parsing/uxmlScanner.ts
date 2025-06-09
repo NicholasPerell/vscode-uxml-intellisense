@@ -82,6 +82,10 @@ export class Scanner {
             this.trim();
         }
 
+        if (this.index >= this.tokens.length) {
+            this.throwParsingErrorAtCurrentIndex(`Reached end of file while expecting another token next ${TokenType[type]}`);
+        }
+
         const prev = this.next();
 
         if (prev.type !== type) {
@@ -96,6 +100,10 @@ export class Scanner {
     }
 
     public nextMatchSome(types: TokenType[]) {
+        if (this.index >= this.tokens.length) {
+            this.throwParsingErrorAtCurrentIndex(`Reached end of file while expecting another token next [${types.map(t => TokenType[t]).join(', ')}]`);
+        }
+
         const prev = this.tokens[this.index];
 
         if (!types.some(t => t === prev.type)) {
@@ -143,6 +151,70 @@ export class Scanner {
         }
 
         throw parsingError;
+    }
+
+    public tryParseOrPanicRecovery<T extends Node>(parse: () => T, panicModeResumers: { tokenType: TokenType, peeking: boolean }[]): T | ParsingError {
+        try {
+            return parse();
+        } catch (error) {
+            let parsingError: ParsingError;
+
+            if (error instanceof ParsingError) {
+                parsingError = error;
+            } else {
+                const current = this.tokens[this.index];
+                const pos = this.document!.positionAt(current.offset);
+                const message = `[Unexpected] (Ln ${pos.line + 1}, Col ${pos.character + 1}) ${error} ${(error as Error)?.stack}`;
+                parsingError = new ParsingError(message, current.offset, current.offset + current.length);
+            }
+
+            while (!this.isEndOfFile()) {
+                const peeked = this.ahead();
+                const resumer = panicModeResumers.find(resumer => resumer.tokenType === peeked.type);
+
+                if (!resumer || !resumer.peeking) {
+                    this.next();
+                }
+
+                if (resumer) {
+                    break;
+                }
+            }
+
+            return parsingError;
+        }
+    }
+
+    public tryOrPanicRecovery(func: () => void, panicModeResumers: { tokenType: TokenType, peeking: boolean }[]): undefined | ParsingError {
+        try {
+            func();
+        } catch (error) {
+            let parsingError: ParsingError;
+
+            if (error instanceof ParsingError) {
+                parsingError = error;
+            } else {
+                const current = this.tokens[this.index];
+                const pos = this.document!.positionAt(current.offset);
+                const message = `[Unexpected] (Ln ${pos.line + 1}, Col ${pos.character + 1}) ${error} ${(error as Error)?.stack}`;
+                parsingError = new ParsingError(message, current.offset, current.offset + current.length);
+            }
+
+            while (!this.isEndOfFile()) {
+                const peeked = this.ahead();
+                const resumer = panicModeResumers.find(resumer => resumer.tokenType === peeked.type);
+
+                if (!resumer || !resumer.peeking) {
+                    this.next();
+                }
+
+                if (resumer) {
+                    break;
+                }
+            }
+
+            return parsingError;
+        }
     }
 
     public getTokenText(token: Token) {
