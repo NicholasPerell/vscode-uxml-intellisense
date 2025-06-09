@@ -6,17 +6,12 @@ import {
   TextDocumentSyncKind,
   InitializeResult,
   DocumentDiagnosticReportKind,
-  DocumentDiagnosticReport,
-  RenameParams,
-  Position,
-  Range,
-  WorkspaceEdit,
+  DocumentDiagnosticReport
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { Parser } from "./parsing/uxmlParser";
 import { doValidation } from "./services/validation";
-import { doPrepareRename, doRenameRequest } from "./services/renaming";
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
