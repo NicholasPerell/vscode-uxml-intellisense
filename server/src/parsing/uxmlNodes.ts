@@ -251,6 +251,9 @@ export class Element extends Content {
                             { tokenType: TokenType.EndOpenAngle, peeking: true },
                             { tokenType: TokenType.OpenAngle, peeking: true }
                         ]);
+                        if (node instanceof ParsingError) {
+                            scanner.retreatTo(scanner.current());
+                        }
                         break;
                     case TokenType.EndOpenAngle:
                         node = scanner.tryParseOrPanicRecovery(() => new EndElement(scanner), [
@@ -274,6 +277,7 @@ export class Element extends Content {
                 const t = scanner.next();
             }
         } while ((!node || node instanceof ParsingError || node instanceof Content) && !scanner.isEndOfFile());
+
 
         if (node instanceof EndElement) {
             this.endElement = node as EndElement;
@@ -510,19 +514,28 @@ export class LeafElement extends Content {
             const matchError = scanner.tryOrPanicRecovery(() => scanner.nextMatch(TokenType.Whitespace, TrimOptions.End), [
                 { tokenType: TokenType.Whitespace, peeking: false },
                 { tokenType: TokenType.EndCloseAngle, peeking: true },
+                { tokenType: TokenType.EndOpenAngle, peeking: true },
                 { tokenType: TokenType.OpenAngle, peeking: true }
             ])
 
             if (matchError) {
                 this.errors.push(matchError);
+                if (scanner.isAheadSome([TokenType.OpenAngle, TokenType.EndOpenAngle])) {
+                    scanner.throwParsingErrorAtToken('LeafElement can not handle an open angle bracket inside its scope.', scanner.ahead());
+                }
             }
 
             const attribute = this.tryConstruct(Attribute, scanner, [
                 { tokenType: TokenType.Whitespace, peeking: true },
                 { tokenType: TokenType.EndCloseAngle, peeking: true },
+                { tokenType: TokenType.EndOpenAngle, peeking: true },
                 { tokenType: TokenType.OpenAngle, peeking: true }
             ]);
-            if (attribute) { this.attributes.push(attribute); }
+            if (attribute) {
+                this.attributes.push(attribute);
+            } else if (scanner.isAheadSome([TokenType.OpenAngle, TokenType.EndOpenAngle])) {
+                scanner.throwParsingErrorAtToken('LeafElement can not handle an open angle bracket inside its scope.', scanner.ahead());
+            }
             scanner.nextMatch(TokenType.Whitespace, TrimOptions.End);
             peeked = scanner.aheadTrimmed();
         }
@@ -561,21 +574,28 @@ export class StartElement extends Node {
             const matchError = scanner.tryOrPanicRecovery(() => scanner.nextMatch(TokenType.Whitespace, TrimOptions.End), [
                 { tokenType: TokenType.Whitespace, peeking: false },
                 { tokenType: TokenType.CloseAngle, peeking: true },
+                { tokenType: TokenType.EndOpenAngle, peeking: true },
                 { tokenType: TokenType.OpenAngle, peeking: true }
             ])
 
             if (matchError) {
+                if (scanner.isAheadSome([TokenType.OpenAngle, TokenType.EndOpenAngle])) {
+                    scanner.throwParsingErrorAtToken('StartElement can not handle an open angle bracket inside its scope.', scanner.ahead());
+                }
                 this.errors.push(matchError);
             }
 
             const attribute = this.tryConstruct(Attribute, scanner, [
                 { tokenType: TokenType.Whitespace, peeking: false },
                 { tokenType: TokenType.CloseAngle, peeking: true },
+                { tokenType: TokenType.EndOpenAngle, peeking: true },
                 { tokenType: TokenType.OpenAngle, peeking: true }
             ]);
 
             if (attribute) {
                 this.attributes.push(attribute);
+            } else if (scanner.isAheadSome([TokenType.OpenAngle, TokenType.EndOpenAngle])) {
+                scanner.throwParsingErrorAtToken('StartElement can not handle an open angle bracket inside its scope.', scanner.ahead());
             }
 
             peeked = scanner.aheadTrimmed();

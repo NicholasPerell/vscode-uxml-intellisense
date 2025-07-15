@@ -90,15 +90,15 @@ connection.languages.diagnostics.on(async (params) => {
 documents.onDidChangeContent((change) => {
   const document = documents.get(change.document.uri);
   const parser = new Parser(document!);
-  parser.getErrors().forEach(e =>
-    connection.window.showErrorMessage(
-      `${e}`
-    ));
-  if (parser.getProgram()?.nsEngine) {
-    connection.window.showInformationMessage(
-      parser.getProgram()!.nsEngine!
-    )
-  }
+  // parser.getErrors().forEach(e =>
+  //   connection.window.showErrorMessage(
+  //     `${e}`
+  //   ));
+  // if (parser.getProgram()?.nsEngine) {
+  //   connection.window.showInformationMessage(
+  //     parser.getProgram()!.nsEngine!
+  //   )
+  // }
 });
 
 // connection.onPrepareRename(doPrepareRename);

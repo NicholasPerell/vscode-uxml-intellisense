@@ -46,8 +46,8 @@ export class Scanner {
     }
 
     public current() {
-        if (this.index - 1 >= this.tokens.length) {
-            this.throwParsingErrorAtCurrentIndex("Reached end of file while expecting another token ahead");
+        if (this.index - 1 < 0 || this.index - 1 >= this.tokens.length) {
+            this.throwParsingErrorAtCurrentIndex("Current was expecting to be upon a token");
         }
 
         return this.tokens[this.index - 1];

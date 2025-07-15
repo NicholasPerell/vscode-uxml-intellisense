@@ -35,6 +35,45 @@ export function doCompletion(document: TextDocument, position: Position, info: (
     } else if (currentNode?.type === NodeType.Namespace) {
 
     } else if (currentNode?.type === NodeType.Element) {
+        const fullText = document.getText();
+        if (offset > currentWord.length) {
+            const beforeIndex = offset - currentWord.length - 1;
+            const before = fullText[beforeIndex];
+            if (before === '<') {
+                if (!!nsEngine && nsEngine !== '') {
+                    result.items.push(doNameSpaceCompletion(range, nsEngine));
+                } else {
+                    result.items.push(...doElementCompletion(range, engineElements));
+                }
+
+                if (!!nsEditor && nsEditor !== '') {
+                    result.items.push(doNameSpaceCompletion(range, nsEditor));
+                } else {
+                    result.items.push(...doElementCompletion(range, editorElements));
+                }
+            } else if (before === ':') {
+                let woah = beforeIndex;
+                for (let i = beforeIndex - 1; i >= 0; i--) {
+                    if (!fullText[i].match(/[a-zA-Z]/)) {
+                        break;
+                    }
+
+                    woah = i;
+                }
+
+                const ns = woah === beforeIndex
+                    ? ''
+                    : fullText.substring(woah, beforeIndex);
+
+                if (ns === '') {
+
+                } else if (!!nsEngine && ns === nsEngine) {
+                    result.items.push(...doElementCompletion(range, engineElements));
+                } else if (!!nsEngine && ns === nsEditor) {
+                    result.items.push(...doElementCompletion(range, editorElements));
+                }
+            }
+        }
 
     } else if (currentNode?.type === NodeType.LeafElement || currentNode?.type === NodeType.StartElement) {
         // const rulesStored = currentNode.getChildNodes();
@@ -71,7 +110,8 @@ export function doCompletion(document: TextDocument, position: Position, info: (
     } else if (currentNode?.type === undefined) {
         const fullText = document.getText();
         if (offset > currentWord.length) {
-            const before = fullText[offset - currentWord.length - 1];
+            const beforeIndex = offset - currentWord.length - 1;
+            const before = fullText[beforeIndex];
             if (before === '<') {
                 if (!!nsEngine && nsEngine !== '') {
                     result.items.push(doNameSpaceCompletion(range, nsEngine));
@@ -85,7 +125,26 @@ export function doCompletion(document: TextDocument, position: Position, info: (
                     result.items.push(...doElementCompletion(range, editorElements));
                 }
             } else if (before === ':') {
+                let woah = beforeIndex;
+                for (let i = beforeIndex - 1; i >= 0; i--) {
+                    if (!fullText[i].match(/[a-zA-Z]/)) {
+                        break;
+                    }
 
+                    woah = i;
+                }
+
+                const ns = woah === beforeIndex
+                    ? ''
+                    : fullText.substring(woah, beforeIndex);
+
+                if (ns === '') {
+
+                } else if (!!nsEngine && ns === nsEngine) {
+                    result.items.push(...doElementCompletion(range, engineElements));
+                } else if (!!nsEngine && ns === nsEditor) {
+                    result.items.push(...doElementCompletion(range, editorElements));
+                }
             }
         }
     }
