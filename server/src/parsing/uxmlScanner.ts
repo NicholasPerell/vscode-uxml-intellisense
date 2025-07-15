@@ -17,6 +17,14 @@ export class Scanner {
     private tokens: Token[] = [];
     private document: TextDocument;
     private index = 0;
+    private last;
+
+    public retreatTo(token: Token) {
+        const findIndex = this.tokens.indexOf(token);
+        if (findIndex >= 0) {
+            this.index = findIndex;
+        }
+    }
 
     public isEndOfFile() {
         return this.index >= this.tokens.length
@@ -35,6 +43,14 @@ export class Scanner {
         }
 
         return this.tokens[this.index];
+    }
+
+    public current() {
+        if (this.index - 1 >= this.tokens.length) {
+            this.throwParsingErrorAtCurrentIndex("Reached end of file while expecting another token ahead");
+        }
+
+        return this.tokens[this.index - 1];
     }
 
     public aheadTrimmed() {
@@ -117,6 +133,7 @@ export class Scanner {
     public constructor(document: TextDocument) {
         this.document = document;
         this.tokens = this.lexer.tokenize(document);
+        this.last = document.getText().length - 1;
     }
 
     public tryParse(parsers: Array<() => Node>): Node {
@@ -151,6 +168,33 @@ export class Scanner {
         }
 
         throw parsingError;
+    }
+
+    public tryParsersOrPanicRecovery(parsers: Array<() => Node>, panicModeResumers: { tokenType: TokenType, peeking: boolean }[]): Node | ParsingError {
+        const mark = this.index;
+
+        let parsingErrorRtn: ParsingError | undefined;
+        let continueFrom: number | undefined;
+
+        for (const parse of parsers) {
+            const result = this.tryParseOrPanicRecovery(parse, panicModeResumers);
+
+            if (result instanceof Node) {
+                return result;
+            } else if (!continueFrom || continueFrom >= this.index) {
+                parsingErrorRtn = result;
+                continueFrom = this.index;
+            }
+
+            this.index = mark;
+        }
+
+        if (parsingErrorRtn && continueFrom) {
+            this.index = continueFrom;
+            return parsingErrorRtn;
+        }
+
+        throw 'Unexpected ending to tryParsersOrPanicRecovery reached!';
     }
 
     public tryParseOrPanicRecovery<T extends Node>(parse: () => T, panicModeResumers: { tokenType: TokenType, peeking: boolean }[]): T | ParsingError {
@@ -255,9 +299,13 @@ export class Scanner {
     }
 
     public throwParsingErrorBetweenTokens(message: string, startToken: Token, endToken: Token) {
+        throw this.getParsingErrorBetweenTokens(message, startToken, endToken);
+    }
+
+    public getParsingErrorBetweenTokens(message: string, startToken: Token, endToken: Token) {
         const pos = this.document!.positionAt(startToken.offset);
         message = `(Ln ${pos.line + 1}, Col ${pos.character + 1}) ${message}`;
-        throw new ParsingError(message, startToken.offset, endToken.offset + endToken.length);
+        return new ParsingError(message, startToken.offset, endToken.offset + endToken.length);
     }
 
     public throwParsingErrorAtToken(message: string, token: Token) {
@@ -267,9 +315,13 @@ export class Scanner {
     }
 
     public throwParsingErrorAtCurrentIndex(message: string) {
+        throw this.getParsingErrorAtCurrentIndex(message);
+    }
+
+    public getParsingErrorAtCurrentIndex(message: string) {
         const offset = this.index < this.tokens.length
             ? this.tokens[this.index].offset
-            : this.tokens[this.tokens.length - 1].offset + this.tokens.length - 1;
+            : this.last;
 
         const pos = this.document!.positionAt(offset);
         message = `(Ln ${pos.line + 1}, Col ${pos.character + 1}) ${message}`;
@@ -277,9 +329,13 @@ export class Scanner {
     }
 
     public throwParsingErrorBetweenOffsets(message: string, start: number, end: number) {
+        throw this.getParsingErrorBetweenOffsets(message, start, end);
+    }
+
+    public getParsingErrorBetweenOffsets(message: string, start: number, end: number) {
         const pos = this.document!.positionAt(start);
         message = `(Ln ${pos.line + 1}, Col ${pos.character + 1}) ${message}`;
-        throw new ParsingError(message, start, end);
+        return new ParsingError(message, start, end);
     }
 
     public getCurrentToken(offset: number) {

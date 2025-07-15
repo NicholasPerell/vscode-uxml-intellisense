@@ -1,3 +1,4 @@
+import { error } from "console";
 import { ParsingError } from "./uxmlError";
 import { Scanner, TrimOptions } from "./uxmlScanner";
 import { Token, TokenType } from "./uxmlTokens";
@@ -5,9 +6,7 @@ import { Token, TokenType } from "./uxmlTokens";
 export enum NodeType {
     Program,
     Declaration,
-    Root,
     Element,
-    Content,
     Comment,
     Namespace,
     Name,
@@ -45,7 +44,9 @@ export abstract class Node {
     }
 
     getErrors(): ParsingError[] {
-        return [...this.errors, ...this.getChildNodes().flatMap(n => n.getErrors())];
+        const childNodes = this.getChildNodes().filter(n => !!n && n instanceof Node);
+        const errors = childNodes.length > 0 ? childNodes.flatMap(n => n.getErrors()) : [];
+        return [...this.errors, ...errors];
     }
 
     tryConstruct<Type extends Node>(ctor: new (arg0: Scanner) => Type, scanner: Scanner, panicModeResumers: { tokenType: TokenType, peeking: boolean }[]): Type | undefined {
@@ -67,6 +68,7 @@ export class Program extends Node {
     root?: Element;
     nsEngine?: string;
     nsEngineNodes: Node[] = [];
+    nsEditor?: string;
 
     public constructor(scanner: Scanner) {
         super(scanner);
@@ -116,8 +118,7 @@ export class Program extends Node {
         const editorNameSpace = editorNameSpaceAttribute?.name.namespace ? editorNameSpaceAttribute?.name.name : '';
 
         this.nsEngine = engineNameSpace;
-
-
+        this.nsEditor = editorNameSpace;
 
         if (uxmlNameSpace !== engineNameSpace) {
             const node = rootName.namespace ?? rootName;
@@ -212,7 +213,7 @@ export abstract class Content extends Node {
 }
 
 export class Element extends Content {
-    type = NodeType.Root;
+    type = NodeType.Element;
     startElement: StartElement;
     content: Content[] = [];
     endElement: EndElement;
@@ -220,22 +221,69 @@ export class Element extends Content {
     public constructor(scanner: Scanner) {
         super(scanner);
         this.startElement = new StartElement(scanner);
-        let node: Node;
+        let node: Node | ParsingError | undefined;
+
+        let unknownStart: Token | undefined;
+        let unknownEnd: Token | undefined;
 
         do {
-            node = scanner.tryParse([
-                () => new Comment(scanner),
-                () => new LeafElement(scanner),
-                () => new Element(scanner),
-                () => new EndElement(scanner),
-            ]);
+            if (scanner.isAheadSomeTrimmed([TokenType.CommentStart, TokenType.OpenAngle, TokenType.EndOpenAngle])) {
+                if (unknownStart) {
+                    node = scanner.getParsingErrorBetweenTokens('Unknown Contents', unknownStart, unknownEnd!);
+                    this.errors.push(node);
+                    unknownStart = undefined;
+                    unknownEnd = undefined;
+                }
 
-            if (node instanceof Content) {
-                this.content.push(node);
+                const peek = scanner.aheadTrimmed();
+                scanner.trim();
+
+                switch (peek.type) {
+                    case TokenType.CommentStart:
+                        node = scanner.tryParseOrPanicRecovery(() => new Comment(scanner), [
+                            { tokenType: TokenType.CommentEnd, peeking: false }
+                        ]);
+                        break;
+                    case TokenType.OpenAngle:
+                        node = scanner.tryParsersOrPanicRecovery([() => new LeafElement(scanner), () => new Element(scanner)], [
+                            { tokenType: TokenType.CommentStart, peeking: true },
+                            { tokenType: TokenType.CloseAngle, peeking: false },
+                            { tokenType: TokenType.EndOpenAngle, peeking: true },
+                            { tokenType: TokenType.OpenAngle, peeking: true }
+                        ]);
+                        break;
+                    case TokenType.EndOpenAngle:
+                        node = scanner.tryParseOrPanicRecovery(() => new EndElement(scanner), [
+                            { tokenType: TokenType.CommentStart, peeking: true },
+                            { tokenType: TokenType.EndOpenAngle, peeking: true },
+                            { tokenType: TokenType.OpenAngle, peeking: true }
+                        ]);
+                        break;
+                }
+
+                if (node instanceof Content) {
+                    this.content.push(node);
+                } else if (node instanceof ParsingError) {
+                    this.errors.push(node)
+                }
+            } else {
+                if (!unknownStart) {
+                    unknownStart = scanner.aheadTrimmed();
+                }
+                unknownEnd = scanner.aheadTrimmed();
+                const t = scanner.next();
             }
-        } while (node instanceof Content);
+        } while ((!node || node instanceof ParsingError || node instanceof Content) && !scanner.isEndOfFile());
 
-        this.endElement = node as EndElement;
+        if (node instanceof EndElement) {
+            this.endElement = node as EndElement;
+            if (this.endElement.name.text !== this.startElement.name.text) {
+                scanner.retreatTo(this.endElement.start);
+                scanner.throwParsingErrorBetweenOffsets(`Expected EndElement for ${this.startElement.name.text}.`, this.endElement.name.getStart(), this.endElement.name.getEnd());
+            }
+        } else {
+            throw scanner.getParsingErrorAtCurrentIndex(`EndElement for ${this.startElement.name.text} not found.`);
+        }
     }
 
     getStart(): number {
