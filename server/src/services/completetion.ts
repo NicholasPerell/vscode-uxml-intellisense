@@ -1,7 +1,8 @@
-import { Position, CompletionList, CompletionItem, CompletionItemKind, TextEdit, InsertTextFormat } from "vscode-languageserver";
-import { NodeType, Program } from "../parsing/uxmlNodes";
+import { Position, CompletionList, CompletionItem, CompletionItemKind, TextEdit, InsertTextFormat, Color } from "vscode-languageserver";
+import { Element, NodeType, Program } from "../parsing/uxmlNodes";
 import { Scanner } from "../parsing/uxmlScanner";
 import { Range, TextDocument } from "vscode-languageserver-textdocument";
+import { off } from "process";
 
 export function doCompletion(document: TextDocument, position: Position, info: (s: string) => void): CompletionList {
     const scanner = new Scanner(document);
@@ -34,9 +35,11 @@ export function doCompletion(document: TextDocument, position: Position, info: (
 
     } else if (currentNode?.type === NodeType.Namespace) {
 
-    } else if (currentNode?.type === NodeType.Element) {
+    } else if (currentNode instanceof Element) {
+
         const fullText = document.getText();
-        if (offset > currentWord.length) {
+
+        if (offset > currentWord.length && currentWord.length > 0) {
             const beforeIndex = offset - currentWord.length - 1;
             const before = fullText[beforeIndex];
             if (before === '<') {
@@ -73,6 +76,30 @@ export function doCompletion(document: TextDocument, position: Position, info: (
                     result.items.push(...doElementCompletion(range, editorElements));
                 }
             }
+        } else if (offset > 1 && fullText[offset - 1] === '>' && fullText[offset - 2] !== '/') {
+
+            const startElementEnd = currentNode.startElement.getEnd();
+
+            const lastIndexOpen = fullText.lastIndexOf('<', offset);
+
+            if (
+                lastIndexOpen !== startElementEnd &&
+                fullText[lastIndexOpen + 1].match(/[a-zA-Z]/) &&
+                program.addIfEncasing(lastIndexOpen)[0] === currentNode
+            ) {
+                const after = fullText.substring(lastIndexOpen + 1);
+
+                const elementName = after.match(/[a-zA-Z]+(:[a-zA-Z]+)?/)![0];
+                const name = `</${elementName} >`
+                info(name);
+                result.items.push({
+                    label: name,
+                    kind: CompletionItemKind.Reference,
+                    insertTextFormat: InsertTextFormat.PlainText,
+                    textEdit: TextEdit.replace(range, name)
+                });
+            }
+
         }
 
     } else if (currentNode?.type === NodeType.LeafElement || currentNode?.type === NodeType.StartElement) {

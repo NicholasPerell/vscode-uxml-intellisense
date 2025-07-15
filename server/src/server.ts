@@ -47,6 +47,7 @@ connection.onInitialize((params: InitializeParams) => {
   const result: InitializeResult = {
     capabilities: {
       completionProvider: {
+        triggerCharacters: ['/', '>', '<'],
         resolveProvider: true
       },
       textDocumentSync: TextDocumentSyncKind.Incremental,
