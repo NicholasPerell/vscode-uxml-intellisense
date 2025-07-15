@@ -6,12 +6,15 @@ import {
   TextDocumentSyncKind,
   InitializeResult,
   DocumentDiagnosticReportKind,
-  DocumentDiagnosticReport
+  DocumentDiagnosticReport,
+  CompletionList,
+  TextDocumentPositionParams
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { Parser } from "./parsing/uxmlParser";
 import { doValidation } from "./services/validation";
+import { doCompletion, doCompletionResolve } from "./services/completetion";
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -100,6 +103,29 @@ documents.onDidChangeContent((change) => {
 
 // connection.onPrepareRename(doPrepareRename);
 // connection.onRenameRequest(doRenameRequest);
+
+
+// This handler provides the initial list of the completion items.
+connection.onCompletion(
+  (params: TextDocumentPositionParams): CompletionList => {
+    const position = params.position;
+    const doc = documents.get(params.textDocument.uri);
+
+    if (!doc) {
+      return {
+        isIncomplete: false,
+        items: []
+      };
+    }
+
+    return doCompletion(doc, position, connection.window.showInformationMessage.bind(connection.window));
+  }
+);
+
+
+// This handler resolves additional information for the item selected in
+// the completion list.
+connection.onCompletionResolve(doCompletionResolve);
 
 // Make the text document manager listen on the connection
 // for open, change and close text document events
