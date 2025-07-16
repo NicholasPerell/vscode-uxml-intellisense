@@ -1,5 +1,5 @@
 import { Position, CompletionList, CompletionItem, CompletionItemKind, TextEdit, InsertTextFormat, Color } from "vscode-languageserver";
-import { Element, Name, Node, NodeType, Program } from "../parsing/uxmlNodes";
+import { Element, EndElement, LeafElement, Name, Node, NodeType, Program, StartElement } from "../parsing/uxmlNodes";
 import { Scanner } from "../parsing/uxmlScanner";
 import { Range, TextDocument } from "vscode-languageserver-textdocument";
 import { Token } from "../parsing/uxmlTokens";
@@ -53,8 +53,6 @@ class Completion {
             items: []
         };
 
-        info(`${this.offset} ${NodeType[currentNode?.type]} "${this.currentWord}" ${this.program.root !== undefined}`);
-
         this.nsEngine = this.program.nsEngine;
         this.nsEditor = this.program.nsEditor;
 
@@ -73,6 +71,11 @@ class Completion {
 
     private inNameCompletion() {
         const currentNode = this.currentNode as Name;
+
+        if (!(this.encases[1] instanceof StartElement || this.encases[1] instanceof LeafElement || this.encases[1] instanceof EndElement)) {
+            return;
+        }
+
         const nsEngine = this.nsEngine;
         const nsEditor = this.nsEditor;
 
@@ -90,6 +93,10 @@ class Completion {
     }
 
     private inNamespaceCompletion() {
+        if (!(this.encases[1] instanceof StartElement || this.encases[1] instanceof LeafElement || this.encases[1] instanceof EndElement)) {
+            return;
+        }
+
         const nsEngine = this.nsEngine;
         const nsEditor = this.nsEditor;
 
@@ -243,7 +250,7 @@ class Completion {
             if (
                 lastIndexOpen >= 0 &&
                 fullText[lastIndexOpen + 1].match(/[a-zA-Z]/) &&
-                !this.program.addIfEncasing(lastIndexOpen)?.length
+                this.program.addIfEncasing(lastIndexOpen).length === 1
             ) {
                 const after = fullText.substring(lastIndexOpen + 1);
                 const elementName = after.match(/[a-zA-Z]+(:[a-zA-Z]+)?/)![0];
@@ -269,8 +276,8 @@ class Completion {
                 lastIndexOpen >= 0 &&
                 fullText[lastIndexClose - 1] !== '/' &&
                 fullText[lastIndexOpen + 1].match(/[a-zA-Z]/) &&
-                !this.program.addIfEncasing(lastIndexOpen)?.length &&
-                !this.program.addIfEncasing(lastIndexClose)?.length
+                this.program.addIfEncasing(lastIndexOpen).length === 1 &&
+                this.program.addIfEncasing(lastIndexClose).length === 1
             ) {
                 const after = fullText.substring(lastIndexOpen + 1);
                 const elementName = after.match(/[a-zA-Z]+(:[a-zA-Z]+)?/)![0];
