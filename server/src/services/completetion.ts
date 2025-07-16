@@ -170,8 +170,6 @@ class Completion {
             const lastIndexClose = fullText.lastIndexOf('>', offset);
             const lastIndexOpen = fullText.lastIndexOf('<', lastIndexClose);
 
-            this.info('close tagger ' + fullText.substring(lastIndexOpen, lastIndexClose + 1));
-
             if (
                 lastIndexOpen > startElementEnd &&
                 fullText[lastIndexClose - 1] !== '/' &&
