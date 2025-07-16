@@ -295,6 +295,8 @@ class Completion {
     }
 
     private pushCompletionsAtStartOpenAngle() {
+        this.result.items.push(...doElementCompletion(this.range, [style]));
+
         if (!!this.nsEngine && this.nsEngine !== '') {
             this.result.items.push(doNameSpaceCompletion(this.range, this.nsEngine));
         } else {
@@ -422,3 +424,4 @@ const template = 'Template';
 const instance = 'Instance';
 const columns = 'Columns';
 const column = 'Column';
+const style = 'Style';
