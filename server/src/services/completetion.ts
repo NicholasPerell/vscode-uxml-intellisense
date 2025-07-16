@@ -25,6 +25,8 @@ class Completion {
     private currentNode: Node;
     private result: CompletionList;
     private fullText: string;
+    private underScoreEncoding: boolean;
+    private hasTwStyle: boolean;
 
     public constructor(document: TextDocument, position: Position, info: (s: string) => void) {
         this.document = document;
@@ -53,6 +55,10 @@ class Completion {
             items: []
         };
 
+        this.underScoreEncoding = false;
+        this.hasTwStyle = false;
+        this.determineTwUsage();
+
         this.nsEngine = this.program.nsEngine;
         this.nsEditor = this.program.nsEditor;
 
@@ -66,6 +72,36 @@ class Completion {
             this.inLeafStartElementCompletion();
         } else if (currentNode?.type === undefined) {
             this.inUndefinedCompletion();
+        }
+    }
+
+    private determineTwUsage() {
+        const uri = this.document.uri;
+        const lastIndex = uri.lastIndexOf('/');
+        const filename = lastIndex < 0 ? uri : uri.substring(lastIndex + 1);
+        const extensionIndex = filename.lastIndexOf('.');
+        const name = extensionIndex < 0 ? filename : filename.substring(0, extensionIndex);
+        const extension = extensionIndex < 0 ? '' : filename.substring(extensionIndex + 1);
+
+        this.underScoreEncoding = extension.toLowerCase() === 'uxml_';
+        this.hasTwStyle = false;
+
+        if (!this.program.root) {
+            return;
+        }
+
+        for (let child of this.program.root.getChildNodes()) {
+            if (child instanceof LeafElement && child.name.text === style) {
+                if (child.attributes.some(att => att.name.text === 'src' && att.value.contentText.includes(`${name}.tw.uss`))) {
+                    this.hasTwStyle = true;
+                    break;
+                }
+            } else if (child instanceof Element && child.startElement.name.text === style) {
+                if (child.startElement.attributes.some(att => att.name.text === 'src' && att.value.contentText.includes(`${name}.tw.uss`))) {
+                    this.hasTwStyle = true;
+                    break;
+                }
+            }
         }
     }
 
