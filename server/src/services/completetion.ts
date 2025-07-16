@@ -1,8 +1,7 @@
 import { Position, CompletionList, CompletionItem, CompletionItemKind, TextEdit, InsertTextFormat, Color } from "vscode-languageserver";
-import { Element, Name, Namespace, Node, NodeType, Program } from "../parsing/uxmlNodes";
+import { Element, Name, Node, NodeType, Program } from "../parsing/uxmlNodes";
 import { Scanner } from "../parsing/uxmlScanner";
 import { Range, TextDocument } from "vscode-languageserver-textdocument";
-import { off } from "process";
 import { Token } from "../parsing/uxmlTokens";
 
 export function doCompletion(document: TextDocument, position: Position, info: (s: string) => void): CompletionList {
@@ -55,7 +54,6 @@ class Completion {
         };
 
         info(`${this.offset} ${NodeType[currentNode?.type]} "${this.currentWord}" ${this.program.root !== undefined}`);
-
 
         this.nsEngine = this.program.nsEngine;
         this.nsEditor = this.program.nsEditor;
