@@ -1,5 +1,5 @@
 import { Position, CompletionList, CompletionItem, CompletionItemKind, TextEdit, InsertTextFormat, Color } from "vscode-languageserver";
-import { Element, EndElement, LeafElement, Name, Node, NodeType, Program, StartElement } from "../parsing/uxmlNodes";
+import { Attribute, AttributeValue, Element, EndElement, LeafElement, Name, Node, NodeType, Program, StartElement } from "../parsing/uxmlNodes";
 import { Scanner } from "../parsing/uxmlScanner";
 import { Range, TextDocument } from "vscode-languageserver-textdocument";
 import { Token } from "../parsing/uxmlTokens";
@@ -59,6 +59,8 @@ class Completion {
         this.hasTwStyle = false;
         this.determineTwUsage();
 
+        info(this.underScoreEncoding + ' ' + this.hasTwStyle);
+
         this.nsEngine = this.program.nsEngine;
         this.nsEditor = this.program.nsEditor;
 
@@ -70,6 +72,8 @@ class Completion {
             this.inElementCompletion();
         } else if (currentNode?.type === NodeType.LeafElement || currentNode?.type === NodeType.StartElement) {
             this.inLeafStartElementCompletion();
+        } else if (currentNode?.type === NodeType.AttributeValue) {
+            this.inAttributeValueCompletion();
         } else if (currentNode?.type === undefined) {
             this.inUndefinedCompletion();
         }
@@ -330,6 +334,20 @@ class Completion {
         }
     }
 
+    private inAttributeValueCompletion() {
+        if (!this.hasTwStyle) { return; }
+
+        const attribute = this.encases[1] as Attribute;
+
+        if (attribute.name.text !== 'class') {
+            return;
+        }
+
+        const value = this.currentNode as AttributeValue;
+
+        this.result.items.push(...doTwClassCompletion(this.range, ['flex', 'hidden', 'bg-red-500', 'bg-red-600', 'bg-red-700', 'bg-red-800']));
+    }
+
     private pushCompletionsAtStartOpenAngle() {
         this.result.items.push(...doElementCompletion(this.range, [style]));
 
@@ -374,6 +392,18 @@ function doElementCompletion(range: Range, elements: string[]) {
         const item: CompletionItem = {
             label: name,
             kind: CompletionItemKind.Reference,
+            insertTextFormat: InsertTextFormat.PlainText,
+            textEdit: TextEdit.replace(range, name)
+        }
+        return item;
+    });
+}
+
+function doTwClassCompletion(range: Range, elements: string[]) {
+    return elements.map(name => {
+        const item: CompletionItem = {
+            label: name,
+            kind: CompletionItemKind.Constant,
             insertTextFormat: InsertTextFormat.PlainText,
             textEdit: TextEdit.replace(range, name)
         }
