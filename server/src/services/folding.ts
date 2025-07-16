@@ -24,11 +24,7 @@ function checkForFolds(node: Node, document: TextDocument): FoldingRange[] {
             startCharacter: startPos.character,
             endLine: endPos.line,
             endCharacter: endPos.character,
-            kind: 'region',
-            collapsedText: document.getText({
-                start: endPos,
-                end: document.positionAt(node.endElement.getEnd())
-            })
+            kind: 'region'
         });
     } else if (node instanceof Comment) {
         const startOffset = node.getStart() + 4;
@@ -40,8 +36,7 @@ function checkForFolds(node: Node, document: TextDocument): FoldingRange[] {
             startCharacter: startPos.character,
             endLine: endPos.line,
             endCharacter: endPos.character,
-            kind: 'comment',
-            collapsedText: '-->'
+            kind: 'comment'
         });
     }
 
