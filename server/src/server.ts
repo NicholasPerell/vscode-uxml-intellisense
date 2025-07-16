@@ -15,6 +15,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { Parser } from "./parsing/uxmlParser";
 import { doValidation } from "./services/validation";
 import { doCompletion, doCompletionResolve } from "./services/completetion";
+import { getFoldingRanges } from "./services/folding";
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -56,7 +57,7 @@ connection.onInitialize((params: InitializeParams) => {
         workspaceDiagnostics: false
       },
       renameProvider: true,
-      // foldingRangeProvider: true
+      foldingRangeProvider: true
     }
   };
 
@@ -127,6 +128,14 @@ connection.onCompletion(
 // This handler resolves additional information for the item selected in
 // the completion list.
 connection.onCompletionResolve(doCompletionResolve);
+
+connection.onFoldingRanges((params) => {
+  const document = documents.get(params.textDocument.uri);
+  if (document) {
+    return getFoldingRanges(document);
+  }
+  return null;
+});
 
 // Make the text document manager listen on the connection
 // for open, change and close text document events
