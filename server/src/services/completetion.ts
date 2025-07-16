@@ -165,7 +165,7 @@ class Completion {
                     textEdit: TextEdit.replace(range, name)
                 });
             }
-        } else if (currentWord.length === 0 && offset > 4 && before === '/' && fullText[beforeIndex - 2] !== '<') {
+        } else if (currentWord.length === 0 && offset > 4 && before === '/' && fullText[beforeIndex - 1] === '<') {
             const startElementEnd = currentNode.startElement.getEnd();
             const lastIndexClose = fullText.lastIndexOf('>', offset);
             const lastIndexOpen = fullText.lastIndexOf('<', lastIndexClose);
@@ -197,38 +197,92 @@ class Completion {
     }
 
     private inUndefinedCompletion() {
-        const fullText = this.fullText;
         const offset = this.offset;
         const currentWord = this.currentWord;
+
+        if (
+            offset <= currentWord.length ||
+            offset < 1
+        ) {
+            return;
+        }
+
+        const fullText = this.fullText;
         const nsEngine = this.nsEngine;
         const nsEditor = this.nsEditor;
+        const range = this.range;
 
-        if (offset > currentWord.length) {
-            const beforeIndex = offset - currentWord.length - 1;
-            const before = fullText[beforeIndex];
-            if (before === '<') {
-                this.pushCompletionsAtStartOpenAngle();
-            } else if (before === ':') {
-                let woah = beforeIndex;
-                for (let i = beforeIndex - 1; i >= 0; i--) {
-                    if (!fullText[i].match(/[a-zA-Z]/)) {
-                        break;
-                    }
+        const beforeIndex = offset - currentWord.length - 1;
+        const before = fullText[beforeIndex];
+        if (before === '<') {
+            this.pushCompletionsAtStartOpenAngle();
+        } else if (before === ':') {
+            let nsStartIndex = beforeIndex;
 
-                    woah = i;
-                }
+            while (nsStartIndex > 0 && fullText[nsStartIndex - 1].match(/[a-zA-Z]/)) {
+                nsStartIndex--;
+            }
 
-                const ns = woah === beforeIndex
-                    ? ''
-                    : fullText.substring(woah, beforeIndex);
+            if (
+                nsStartIndex === beforeIndex ||
+                fullText[nsStartIndex - 1] !== '<'
+            ) {
+                return;
+            }
 
-                if (ns === '') {
+            const ns = fullText.substring(nsStartIndex, beforeIndex);
 
-                } else if (!!nsEngine && ns === nsEngine) {
-                    this.result.items.push(...doElementCompletion(this.range, engineElements));
-                } else if (!!nsEditor && ns === nsEditor) {
-                    this.result.items.push(...doElementCompletion(this.range, editorElements));
-                }
+            if (!!nsEngine && ns === nsEngine) {
+                this.result.items.push(...doElementCompletion(range, engineElements));
+            } else if (!!nsEditor && ns === nsEditor) {
+                this.result.items.push(...doElementCompletion(range, editorElements));
+            }
+        } else if (offset > 1 && before === '>' && fullText[beforeIndex - 1] !== '/') {
+            const lastIndexOpen = fullText.lastIndexOf('<', beforeIndex);
+
+            if (
+                lastIndexOpen >= 0 &&
+                fullText[lastIndexOpen + 1].match(/[a-zA-Z]/) &&
+                !this.program.addIfEncasing(lastIndexOpen)?.length
+            ) {
+                const after = fullText.substring(lastIndexOpen + 1);
+                const elementName = after.match(/[a-zA-Z]+(:[a-zA-Z]+)?/)![0];
+                const name = `</${elementName} >`
+                this.info(name);
+                this.result.items.push({
+                    label: name,
+                    kind: CompletionItemKind.Reference,
+                    insertTextFormat: InsertTextFormat.PlainText,
+                    textEdit: TextEdit.replace(range, name)
+                });
+            }
+        } else if (currentWord.length === 0 && offset > 4 && before === '/' && fullText[beforeIndex - 1] === '<') {
+            const lastIndexClose = fullText.lastIndexOf('>', offset);
+
+            if (lastIndexClose < 0) {
+                return;
+            }
+
+            const lastIndexOpen = fullText.lastIndexOf('<', lastIndexClose);
+
+            if (
+                lastIndexOpen >= 0 &&
+                fullText[lastIndexClose - 1] !== '/' &&
+                fullText[lastIndexOpen + 1].match(/[a-zA-Z]/) &&
+                !this.program.addIfEncasing(lastIndexOpen)?.length &&
+                !this.program.addIfEncasing(lastIndexClose)?.length
+            ) {
+                const after = fullText.substring(lastIndexOpen + 1);
+                const elementName = after.match(/[a-zA-Z]+(:[a-zA-Z]+)?/)![0];
+                const name = `${elementName} >`;
+                const label = `</${name}`;
+                this.info(name);
+                this.result.items.push({
+                    label: label,
+                    kind: CompletionItemKind.Reference,
+                    insertTextFormat: InsertTextFormat.PlainText,
+                    textEdit: TextEdit.replace(range, name)
+                });
             }
         }
     }
