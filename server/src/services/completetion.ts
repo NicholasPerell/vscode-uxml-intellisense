@@ -1,5 +1,5 @@
 import { Position, CompletionList, CompletionItem, CompletionItemKind, TextEdit, InsertTextFormat, Color } from "vscode-languageserver";
-import { Element, Node, NodeType, Program } from "../parsing/uxmlNodes";
+import { Element, Name, Namespace, Node, NodeType, Program } from "../parsing/uxmlNodes";
 import { Scanner } from "../parsing/uxmlScanner";
 import { Range, TextDocument } from "vscode-languageserver-textdocument";
 import { off } from "process";
@@ -74,11 +74,34 @@ class Completion {
     }
 
     private inNameCompletion() {
+        const currentNode = this.currentNode as Name;
+        const nsEngine = this.nsEngine;
+        const nsEditor = this.nsEditor;
 
+        if (currentNode.namespace) {
+            const ns = currentNode.namespace.text;
+
+            if (!!nsEngine && ns === nsEngine) {
+                this.result.items.push(...doElementCompletion(this.range, engineElements));
+            } else if (!!nsEditor && ns === nsEditor) {
+                this.result.items.push(...doElementCompletion(this.range, editorElements));
+            }
+        } else {
+            this.pushCompletionsAtStartOpenAngle();
+        }
     }
 
     private inNamespaceCompletion() {
+        const nsEngine = this.nsEngine;
+        const nsEditor = this.nsEditor;
 
+        if (nsEngine) {
+            this.result.items.push(doNameSpaceCompletion(this.range, nsEngine));
+        }
+
+        if (nsEditor) {
+            this.result.items.push(doNameSpaceCompletion(this.range, nsEditor));
+        }
     }
 
     private inElementCompletion() {
@@ -121,7 +144,7 @@ class Completion {
 
             if (!!nsEngine && ns === nsEngine) {
                 this.result.items.push(...doElementCompletion(range, engineElements));
-            } else if (!!nsEngine && ns === nsEditor) {
+            } else if (!!nsEditor && ns === nsEditor) {
                 this.result.items.push(...doElementCompletion(range, editorElements));
             }
         } else if (offset > 1 && before === '>' && fullText[beforeIndex - 2] !== '/') {
