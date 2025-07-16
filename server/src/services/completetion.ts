@@ -144,8 +144,32 @@ class Completion {
                     textEdit: TextEdit.replace(range, name)
                 });
             }
+        } else if (currentWord.length === 0 && offset > 4 && before === '/' && fullText[beforeIndex - 2] !== '<') {
+            const startElementEnd = currentNode.startElement.getEnd();
+            const lastIndexClose = fullText.lastIndexOf('>', offset);
+            const lastIndexOpen = fullText.lastIndexOf('<', lastIndexClose);
 
+            this.info('close tagger ' + fullText.substring(lastIndexOpen, lastIndexClose + 1));
 
+            if (
+                lastIndexOpen > startElementEnd &&
+                fullText[lastIndexClose - 1] !== '/' &&
+                fullText[lastIndexOpen + 1].match(/[a-zA-Z]/) &&
+                this.program.addIfEncasing(lastIndexOpen)[0] === currentNode &&
+                this.program.addIfEncasing(lastIndexClose)[0] === currentNode
+            ) {
+                const after = fullText.substring(lastIndexOpen + 1);
+                const elementName = after.match(/[a-zA-Z]+(:[a-zA-Z]+)?/)![0];
+                const name = `${elementName} >`;
+                const label = `</${name}`;
+                this.info(name);
+                this.result.items.push({
+                    label: label,
+                    kind: CompletionItemKind.Reference,
+                    insertTextFormat: InsertTextFormat.PlainText,
+                    textEdit: TextEdit.replace(range, name)
+                });
+            }
         }
     }
 
