@@ -10,16 +10,15 @@
     "vscode": "^1.75.0"
   },
   "activationEvents": [
-    "onLanguage:uxml"
+    "onLanguage:UnityUXML"
   ],
   "main": "./client/out/extension",
   "contributes": {
     "languages": [
       {
-        "id": "uxml",
+        "id": "UnityUXML",
         "aliases": [
-          "uxml",
-          "uxml_"
+          "UnityUXML"
         ],
         "extensions": [
           ".uxml",
@@ -30,13 +29,13 @@
     ],
     "grammars": [
       {
-        "language": "uxml",
+        "language": "UnityUXML",
         "scopeName": "text.xml.uxml",
         "path": "./syntaxes/uxmlScratch.tmLanguage.json"
       }
     ],
     "configurationDefaults": {
-      "[uxml]": {
+      "[UnityUXML]": {
         "editor.insertSpaces": true,
         "editor.tabSize": 4,
         "editor.quickSuggestions": {
