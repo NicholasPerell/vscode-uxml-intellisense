@@ -1,3 +1,9 @@
+# VS Code UXML Intellisense Extension
+
+Used [Semanticart's Minimum Viable VS Code Language Server Extension](https://github.com/semanticart/minimum-viable-vscode-language-server-extension) as my starting template.
+
+---
+
 # Minimum Viable VS Code Language Server Extension
 
 NOTE: This is heavily based on [lsp-sample from vscode-extension-samples][sample] with the goal of removing example-specific code to ease starting a new Language Server.
