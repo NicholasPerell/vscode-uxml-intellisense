@@ -3,6 +3,7 @@ import { Attribute, AttributeValue, Element, EndElement, LeafElement, Name, Node
 import { Scanner } from "../parsing/uxmlScanner";
 import { Range, TextDocument } from "vscode-languageserver-textdocument";
 import { Token } from "../parsing/uxmlTokens";
+import { documents } from "../server";
 
 export function doCompletion(document: TextDocument, position: Position, context: CompletionContext, info: (s: string) => void): CompletionList {
     const cmp = new Completion(document, position, context, info);
@@ -28,6 +29,7 @@ class Completion {
     private fullText: string;
     private underScoreEncoding: boolean;
     private hasTwStyle: boolean;
+    private unityRoot?: string;
 
     public constructor(document: TextDocument, position: Position, context: CompletionContext, info: (s: string) => void) {
         this.document = document;
@@ -61,7 +63,7 @@ class Completion {
         this.hasTwStyle = false;
         this.determineTwUsage();
 
-        info(this.underScoreEncoding + ' ' + this.hasTwStyle);
+        // info(this.underScoreEncoding + ' ' + this.hasTwStyle);
 
         this.nsEngine = this.program.nsEngine;
         this.nsEditor = this.program.nsEditor;
@@ -108,6 +110,43 @@ class Completion {
                     break;
                 }
             }
+        }
+
+        if (!this.hasTwStyle) {
+            return;
+        }
+
+        let unityRoot = uri;
+        let unityRootLastIndex = uri.lastIndexOf('/');
+
+        while (lastIndex >= 0) {
+            unityRoot = unityRoot.substring(0, unityRootLastIndex);
+
+            const projVersion = documents.get(`${unityRoot}\\ProjectSettings\\ProjectVersion.txt`);
+
+            if (projVersion) {
+                this.info(projVersion.uri);
+                this.unityRoot = unityRoot;
+                break;
+            }
+
+            unityRootLastIndex = unityRoot.lastIndexOf('/');
+        }
+
+        if (!unityRoot) {
+            return;
+        }
+
+        const configDoc = documents.get(`${unityRoot}\\Assets\\UI Toolkit\\tailwinduss.config.json`);
+
+        if (!configDoc) {
+            return;
+        }
+
+        try {
+            const config = JSON.parse(configDoc.getText());
+        } catch {
+
         }
     }
 
