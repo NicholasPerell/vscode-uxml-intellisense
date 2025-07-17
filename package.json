@@ -34,7 +34,19 @@
         "scopeName": "text.xml.uxml",
         "path": "./syntaxes/uxmlScratch.tmLanguage.json"
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "[uxml]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.quickSuggestions": {
+          "other": true,
+          "comments": false,
+          "strings": true
+        },
+        "editor.autoIndent": "keep"
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -45,16 +57,5 @@
   "devDependencies": {
     "@types/node": "^20.5.7",
     "typescript": "^5.2.2"
-  },
-  "configuration": {
-    "title": "Tailwind USS IntelliSense",
-    "properties": {
-      "unity-uxml.suggestions": {
-        "type": "boolean",
-        "default": true,
-        "markdownDescription": "Enable autocomplete suggestions.",
-        "scope": "language-overridable"
-      }
-    }
   }
 }
