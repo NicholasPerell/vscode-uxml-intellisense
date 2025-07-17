@@ -8,7 +8,8 @@ import {
   DocumentDiagnosticReportKind,
   DocumentDiagnosticReport,
   CompletionList,
-  TextDocumentPositionParams
+  TextDocumentPositionParams,
+  CompletionParams
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
@@ -48,7 +49,7 @@ connection.onInitialize((params: InitializeParams) => {
   const result: InitializeResult = {
     capabilities: {
       completionProvider: {
-        triggerCharacters: ['/', '>', '<'],
+        triggerCharacters: ['/', '>', '<', '-', ':'],
         resolveProvider: true
       },
       textDocumentSync: TextDocumentSyncKind.Incremental,
@@ -56,7 +57,7 @@ connection.onInitialize((params: InitializeParams) => {
         interFileDependencies: false,
         workspaceDiagnostics: false
       },
-      renameProvider: true,
+      renameProvider: false,
       foldingRangeProvider: true
     }
   };
@@ -109,18 +110,19 @@ documents.onDidChangeContent((change) => {
 
 // This handler provides the initial list of the completion items.
 connection.onCompletion(
-  (params: TextDocumentPositionParams): CompletionList => {
+  (params: CompletionParams): CompletionList => {
     const position = params.position;
     const doc = documents.get(params.textDocument.uri);
+    const context = params.context;
 
-    if (!doc) {
+    if (!doc || !context) {
       return {
         isIncomplete: false,
         items: []
       };
     }
 
-    return doCompletion(doc, position, connection.window.showInformationMessage.bind(connection.window));
+    return doCompletion(doc, position, context, connection.window.showInformationMessage.bind(connection.window));
   }
 );
 

@@ -45,5 +45,16 @@
   "devDependencies": {
     "@types/node": "^20.5.7",
     "typescript": "^5.2.2"
+  },
+  "configuration": {
+    "title": "Tailwind USS IntelliSense",
+    "properties": {
+      "unity-uxml.suggestions": {
+        "type": "boolean",
+        "default": true,
+        "markdownDescription": "Enable autocomplete suggestions.",
+        "scope": "language-overridable"
+      }
+    }
   }
 }

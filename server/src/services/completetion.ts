@@ -1,17 +1,18 @@
-import { Position, CompletionList, CompletionItem, CompletionItemKind, TextEdit, InsertTextFormat, Color } from "vscode-languageserver";
+import { Position, CompletionList, CompletionItem, CompletionItemKind, TextEdit, InsertTextFormat, Color, CompletionContext } from "vscode-languageserver";
 import { Attribute, AttributeValue, Element, EndElement, LeafElement, Name, Node, NodeType, Program, StartElement } from "../parsing/uxmlNodes";
 import { Scanner } from "../parsing/uxmlScanner";
 import { Range, TextDocument } from "vscode-languageserver-textdocument";
 import { Token } from "../parsing/uxmlTokens";
 
-export function doCompletion(document: TextDocument, position: Position, info: (s: string) => void): CompletionList {
-    const cmp = new Completion(document, position, info);
+export function doCompletion(document: TextDocument, position: Position, context: CompletionContext, info: (s: string) => void): CompletionList {
+    const cmp = new Completion(document, position, context, info);
     return cmp.getResult();
 }
 
 class Completion {
     private document: TextDocument;
     private position: Position;
+    private context: CompletionContext;
     private info: (s: string) => void;
     private scanner: Scanner;
     private program: Program;
@@ -28,9 +29,10 @@ class Completion {
     private underScoreEncoding: boolean;
     private hasTwStyle: boolean;
 
-    public constructor(document: TextDocument, position: Position, info: (s: string) => void) {
+    public constructor(document: TextDocument, position: Position, context: CompletionContext, info: (s: string) => void) {
         this.document = document;
         this.position = position;
+        this.context = context;
         this.info = info;
 
         this.scanner = new Scanner(document);
