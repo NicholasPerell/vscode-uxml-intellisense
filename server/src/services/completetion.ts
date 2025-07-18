@@ -4,6 +4,7 @@ import { Scanner } from "../parsing/uxmlScanner";
 import { Range, TextDocument } from "vscode-languageserver-textdocument";
 import { Token } from "../parsing/uxmlTokens";
 import { documents } from "../server";
+import { defaultTheme, StringDict, Theme, NestedStringDict, FontSizeDict } from "../langFacts/theme";
 
 export function doCompletion(document: TextDocument, position: Position, context: CompletionContext, info: (s: string) => void): CompletionList {
     const cmp = new Completion(document, position, context, info);
@@ -30,6 +31,7 @@ class Completion {
     private underScoreEncoding: boolean;
     private hasTwStyle: boolean;
     private unityRoot?: string;
+    private theme?: any;
 
     public constructor(document: TextDocument, position: Position, context: CompletionContext, info: (s: string) => void) {
         this.document = document;
@@ -63,7 +65,7 @@ class Completion {
         this.hasTwStyle = false;
         this.determineTwUsage();
 
-        // info(this.underScoreEncoding + ' ' + this.hasTwStyle);
+        info(this.underScoreEncoding + ' ' + this.hasTwStyle);
 
         this.nsEngine = this.program.nsEngine;
         this.nsEditor = this.program.nsEditor;
@@ -116,16 +118,20 @@ class Completion {
             return;
         }
 
+        this.theme = defaultTheme();
+        return;
+
         let unityRoot = uri;
         let unityRootLastIndex = uri.lastIndexOf('/');
 
         while (lastIndex >= 0) {
             unityRoot = unityRoot.substring(0, unityRootLastIndex);
+            this.info(`Checking ${unityRoot}/ProjectSettings/ProjectVersion.txt`);
 
-            const projVersion = documents.get(`${unityRoot}\\ProjectSettings\\ProjectVersion.txt`);
+            const projVersion = documents.keys().includes(`${unityRoot}/ProjectSettings/ProjectVersion.txt`);
 
             if (projVersion) {
-                this.info(projVersion.uri);
+                this.info(`${unityRoot}/ProjectSettings/ProjectVersion.txt`);
                 this.unityRoot = unityRoot;
                 break;
             }
@@ -136,17 +142,53 @@ class Completion {
         if (!unityRoot) {
             return;
         }
+        return;
 
-        const configDoc = documents.get(`${unityRoot}\\Assets\\UI Toolkit\\tailwinduss.config.json`);
+        const configDoc = documents.get(`${unityRoot}/Assets/UI Toolkit/tailwinduss.config.json`);
 
         if (!configDoc) {
+            this.info(`Failed to get ${unityRoot}/Assets/UI Toolkit/tailwinduss.config.json config!`);
             return;
         }
+        return;
 
         try {
-            const config = JSON.parse(configDoc.getText());
+            const config = JSON.parse(configDoc!.getText());
+            this.info(`${configDoc!.getText()}`);
+
+            if (config.theme) {
+                for (let [key, value] of config.theme.entries) {
+                    if (key === 'extend') {
+                        for (let [subKey, subValue] of value.entries) {
+                            this.configTheme(subKey, subValue, true);
+                        }
+                    } else {
+                        this.configTheme(key, value, false);
+                    }
+                }
+            }
         } catch {
 
+        }
+    }
+
+    private configTheme(key: string, value: any, extend: boolean) {
+        if (extend) {
+            if (typeof value === "string") {
+                this.theme[key] = value;
+            } else {
+                for (let [subKey, subValue] of value.entries) {
+                    if (typeof subValue === "string") {
+                        this.theme[key][subKey] = subValue;
+                    } else {
+                        for (let [subsubKey, subsubValue] of subValue.entries) {
+                            this.theme[key][subKey][subsubKey] = subsubValue;
+                        }
+                    }
+                }
+            }
+        } else {
+            this.theme[key] = value;
         }
     }
 
@@ -386,7 +428,48 @@ class Completion {
 
         const value = this.currentNode as AttributeValue;
 
-        this.result.items.push(...doTwClassCompletion(this.range, ['flex', 'hidden', 'bg-red-500', 'bg-red-600', 'bg-red-700', 'bg-red-800']));
+        this.result.items.push(...doTwClassCompletion(this.range, ['flex', 'hover', 'bg-red-500']));
+        this.result.items.push(...doTwClassCompletion(this.range, this.buildStrings(this.theme)));
+    }
+
+    private buildStrings(theme: Theme) {
+        const strs: string[] = [];
+
+        for (let [category, data] of Object.entries(theme.strings)) {
+            let prefix = `${category}`;
+
+            if (prefix) {
+                prefix += '-';
+            }
+
+            for (let key of Object.keys(data)) {
+                strs.push(`${prefix}${key}`);
+            }
+        }
+
+        for (let key of Object.keys(theme.fontSize)) {
+            strs.push(`font-${key}`);
+        }
+
+        for (let [category, data] of Object.entries(theme.nests)) {
+            let prefix = `${category}`;
+
+            if (prefix) {
+                prefix += '-';
+            }
+
+            for (let [group, groupData] of Object.entries(data)) {
+                for (let key of Object.keys(groupData)) {
+                    if (key === 'DEFAULT') {
+                        strs.push(`${prefix}${group}`);
+                    } else {
+                        strs.push(`${prefix}${group}-${key}`);
+                    }
+                }
+            }
+        }
+
+        return strs;
     }
 
     private pushCompletionsAtStartOpenAngle() {
