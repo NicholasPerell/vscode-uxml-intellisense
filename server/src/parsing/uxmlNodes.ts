@@ -2,6 +2,8 @@ import { error } from "console";
 import { ParsingError } from "./uxmlError";
 import { Scanner, TrimOptions } from "./uxmlScanner";
 import { Token, TokenType } from "./uxmlTokens";
+import { ParsingWarning } from "./uxmlWarning";
+import { Underscore } from "../util/underscoreEncoding";
 
 export enum NodeType {
     Program,
@@ -21,6 +23,7 @@ export enum NodeType {
 export abstract class Node {
     public readonly abstract type: NodeType;
     protected errors: ParsingError[] = [];
+    protected warnings: ParsingWarning[] = [];
 
     abstract getStart(): number;
     abstract getEnd(): number;
@@ -47,6 +50,12 @@ export abstract class Node {
         const childNodes = this.getChildNodes().filter(n => !!n && n instanceof Node);
         const errors = childNodes.length > 0 ? childNodes.flatMap(n => n.getErrors()) : [];
         return [...this.errors, ...errors];
+    }
+
+    getWarnings(): ParsingWarning[] {
+        const childNodes = this.getChildNodes().filter(n => !!n && n instanceof Node);
+        const warnings = childNodes.length > 0 ? childNodes.flatMap(n => n.getWarnings()) : [];
+        return [...this.warnings, ...warnings];
     }
 
     tryConstruct<Type extends Node>(ctor: new (arg0: Scanner) => Type, scanner: Scanner, panicModeResumers: { tokenType: TokenType, peeking: boolean }[]): Type | undefined {

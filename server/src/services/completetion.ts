@@ -4,7 +4,7 @@ import { Scanner } from "../parsing/uxmlScanner";
 import { Range, TextDocument } from "vscode-languageserver-textdocument";
 import { Token } from "../parsing/uxmlTokens";
 import { documents } from "../server";
-import { defaultTheme, StringDict, Theme, NestedStringDict, FontSizeDict } from "../langFacts/theme";
+import { defaultTheme, StringDict, ThemeRenameRecs, NestedStringDict, FontSizeDict } from "../twFacts/themeAutoCompletes";
 
 export function doCompletion(document: TextDocument, position: Position, context: CompletionContext, info: (s: string) => void): CompletionList {
     const cmp = new Completion(document, position, context, info);
@@ -65,7 +65,7 @@ class Completion {
         this.hasTwStyle = false;
         this.determineTwUsage();
 
-        info(this.underScoreEncoding + ' ' + this.hasTwStyle);
+        // info(this.underScoreEncoding + ' ' + this.hasTwStyle);
 
         this.nsEngine = this.program.nsEngine;
         this.nsEditor = this.program.nsEditor;
@@ -432,7 +432,7 @@ class Completion {
         this.result.items.push(...doTwClassCompletion(this.range, this.buildStrings(this.theme)));
     }
 
-    private buildStrings(theme: Theme) {
+    private buildStrings(theme: ThemeRenameRecs) {
         const strs: string[] = [];
 
         for (let [category, data] of Object.entries(theme.strings)) {

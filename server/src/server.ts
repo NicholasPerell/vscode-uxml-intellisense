@@ -17,6 +17,7 @@ import { Parser } from "./parsing/uxmlParser";
 import { doValidation } from "./services/validation";
 import { doCompletion, doCompletionResolve } from "./services/completetion";
 import { getFoldingRanges } from "./services/folding";
+import { codeAction } from "./services/codeAction";
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -52,13 +53,14 @@ connection.onInitialize((params: InitializeParams) => {
         triggerCharacters: ['/', '>', '<', '-', ':'],
         resolveProvider: true
       },
-      textDocumentSync: TextDocumentSyncKind.Incremental,
+      textDocumentSync: TextDocumentSyncKind.Full,
       diagnosticProvider: {
         interFileDependencies: false,
         workspaceDiagnostics: false
       },
       renameProvider: false,
-      foldingRangeProvider: true
+      foldingRangeProvider: true,
+      codeActionProvider: true,
     }
   };
 
@@ -138,6 +140,8 @@ connection.onFoldingRanges((params) => {
   }
   return null;
 });
+
+connection.onCodeAction(codeAction);
 
 // Make the text document manager listen on the connection
 // for open, change and close text document events
