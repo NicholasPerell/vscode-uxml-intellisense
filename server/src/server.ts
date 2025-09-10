@@ -27,7 +27,7 @@ const connection = createConnection(ProposedFeatures.all);
 export const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
 let hasConfigurationCapability = false;
-let hasWorkspaceFolderCapability = false;
+let hasWorkspaceFolderCapability = true;
 let hasDiagnosticRelatedInformationCapability = false;
 
 connection.onInitialize((params: InitializeParams) => {
@@ -109,8 +109,6 @@ documents.onDidChangeContent((change) => {
 // connection.onPrepareRename(doPrepareRename);
 // connection.onRenameRequest(doRenameRequest);
 
-
-// This handler provides the initial list of the completion items.
 connection.onCompletion(
   (params: CompletionParams): CompletionList => {
     const position = params.position;
@@ -128,9 +126,6 @@ connection.onCompletion(
   }
 );
 
-
-// This handler resolves additional information for the item selected in
-// the completion list.
 connection.onCompletionResolve(doCompletionResolve);
 
 connection.onFoldingRanges((params) => {
@@ -143,9 +138,6 @@ connection.onFoldingRanges((params) => {
 
 connection.onCodeAction(codeAction);
 
-// Make the text document manager listen on the connection
-// for open, change and close text document events
 documents.listen(connection);
 
-// Listen on the connection
 connection.listen();

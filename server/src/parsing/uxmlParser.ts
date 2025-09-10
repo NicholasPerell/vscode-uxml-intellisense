@@ -1,11 +1,8 @@
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { Lexer } from "./uxmlLexer";
-import { Token, TokenType } from "./uxmlTokens";
-import { Range } from "vscode-languageserver";
 import { ParsingError } from "./uxmlError";
 import { Attribute, Node, NodeType, Program } from "./uxmlNodes";
 import { Scanner } from "./uxmlScanner";
-import { off } from "process";
 import { Underscore } from "../util/underscoreEncoding";
 import { ParsingUnderscoreWarning, ParsingWarning } from "./uxmlWarning";
 

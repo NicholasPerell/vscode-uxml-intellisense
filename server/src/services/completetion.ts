@@ -5,6 +5,7 @@ import { Range, TextDocument } from "vscode-languageserver-textdocument";
 import { Token } from "../parsing/uxmlTokens";
 import { documents } from "../server";
 import { defaultTheme, StringDict, ThemeRenameRecs, NestedStringDict, FontSizeDict } from "../twFacts/themeAutoCompletes";
+import { Unity } from "../util/unityNav";
 
 export function doCompletion(document: TextDocument, position: Position, context: CompletionContext, info: (s: string) => void): CompletionList {
     const cmp = new Completion(document, position, context, info);
@@ -65,8 +66,6 @@ class Completion {
         this.hasTwStyle = false;
         this.determineTwUsage();
 
-        // info(this.underScoreEncoding + ' ' + this.hasTwStyle);
-
         this.nsEngine = this.program.nsEngine;
         this.nsEditor = this.program.nsEditor;
 
@@ -118,58 +117,19 @@ class Completion {
             return;
         }
 
-        this.theme = defaultTheme();
-        return;
+        const root = Unity.FindProjectRoot(uri);
 
-        let unityRoot = uri;
-        let unityRootLastIndex = uri.lastIndexOf('/');
-
-        while (lastIndex >= 0) {
-            unityRoot = unityRoot.substring(0, unityRootLastIndex);
-            this.info(`Checking ${unityRoot}/ProjectSettings/ProjectVersion.txt`);
-
-            const projVersion = documents.keys().includes(`${unityRoot}/ProjectSettings/ProjectVersion.txt`);
-
-            if (projVersion) {
-                this.info(`${unityRoot}/ProjectSettings/ProjectVersion.txt`);
-                this.unityRoot = unityRoot;
-                break;
-            }
-
-            unityRootLastIndex = unityRoot.lastIndexOf('/');
-        }
-
-        if (!unityRoot) {
+        if (!root) {
             return;
         }
-        return;
 
-        const configDoc = documents.get(`${unityRoot}/Assets/UI Toolkit/tailwinduss.config.json`);
+        const packages = Unity.ListPackages(root);
 
-        if (!configDoc) {
-            this.info(`Failed to get ${unityRoot}/Assets/UI Toolkit/tailwinduss.config.json config!`);
+        if (!packages || !packages.includes('com.virtualmaker.tailwinduss')) {
             return;
         }
-        return;
 
-        try {
-            const config = JSON.parse(configDoc!.getText());
-            this.info(`${configDoc!.getText()}`);
 
-            if (config.theme) {
-                for (let [key, value] of config.theme.entries) {
-                    if (key === 'extend') {
-                        for (let [subKey, subValue] of value.entries) {
-                            this.configTheme(subKey, subValue, true);
-                        }
-                    } else {
-                        this.configTheme(key, value, false);
-                    }
-                }
-            }
-        } catch {
-
-        }
     }
 
     private configTheme(key: string, value: any, extend: boolean) {

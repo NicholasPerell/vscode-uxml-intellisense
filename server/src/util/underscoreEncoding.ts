@@ -1,5 +1,4 @@
 export namespace Underscore {
-
     export function Encode(decoded: string) {
         let encoded: string = '';
 
